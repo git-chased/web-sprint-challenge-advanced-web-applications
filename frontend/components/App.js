@@ -18,10 +18,13 @@ export default function App() {
 
   // ✨ Research `useNavigate` in React Router v.6
   const navigate = useNavigate()
-  const redirectToLogin = () => { /* ✨ implement */ }
-  const redirectToArticles = () => { /* ✨ implement */ }
+  const redirectToLogin = () => {  navigate('/login')}
+  const redirectToArticles = () => { navigate('/articles')}
 
   const logout = () => {
+    localStorage.removeItem('token')
+    setMessage('Goodbye!')
+    redirectToLogin()
     // ✨ implement
     // If a token is in local storage it should be removed,
     // and a message saying "Goodbye!" should be set in its proper state.
@@ -29,7 +32,31 @@ export default function App() {
     // using the helper above.
   }
 
-  const login = ({ username, password }) => {
+  const login = async ({ username, password }) => {
+    setMessage('')
+    setSpinnerOn(true)
+    redirectToArticles()
+    try {
+      const response = await fetch(loginUrl, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json', Authorization: localStorage.getItem('token')},
+        body: JSON.stringify({username, password})
+      })
+      const data = await response.json()
+
+      if(response.ok){
+        localStorage.setItem('token', data.token)
+        setMessage(data.message)
+      } else if 
+        (response.status === 401){
+          logout()
+      }
+      else {
+        setMessage(data.message)
+      }
+    } catch (error) {
+      setMessage('Login Failed')
+    } finally {setSpinnerOn(false)}
     // ✨ implement
     // We should flush the message state, turn on the spinner
     // and launch a request to the proper endpoint.
@@ -38,7 +65,26 @@ export default function App() {
     // to the Articles screen. Don't forget to turn off the spinner!
   }
 
-  const getArticles = () => {
+  const getArticles = async () => {
+    setMessage('');
+    setSpinnerOn(true)
+    try {
+      const response = await fetch(articlesURL, {
+        headers: {Authorization: localStorage.getItem('token')}
+      })
+      const data = await response.json()
+
+      if (response.ok) {
+        setArticles(data)
+        setMessage(data.message)
+      } else {
+        setMessage('Failed to retrieve articles')
+      }
+    } catch (error) {
+      setMessage('Failed to retrieve articles')
+    } finally {
+      setSpinnerOn(false)
+    }
     // ✨ implement
     // We should flush the message state, turn on the spinner
     // and launch an authenticated request to the proper endpoint.
@@ -49,27 +95,90 @@ export default function App() {
     // Don't forget to turn off the spinner!
   }
 
-  const postArticle = article => {
+  const postArticle = async (article) => {
+    setMessage('');
+    setSpinnerOn(true)
+    try {
+      const response = await fetch(articlesURL, {
+        method: 'POST',
+        headers: {'Content-Type': 'aplication/json', Authorization: localStorage.getItem('token')},
+        body: JSON.stringify(article)
+      })
+      const data = await response.json()
+      if (response.ok) {
+        setArticles([...articles, data])
+        setMessage(data.message)
+      } else {
+        setMessage('Failed to retrieve articles')
+      }
+    } catch (error) {
+      setMessage('Failed to post article')
+    } finally {
+      setSpinnerOn(false)
+    }
+    
     // ✨ implement
     // The flow is very similar to the `getArticles` function.
     // You'll know what to do! Use log statements or breakpoints
     // to inspect the response from the server.
   }
 
-  const updateArticle = ({ article_id, article }) => {
+  const updateArticle = async ({ article_id, article }) => {
     // ✨ implement
     // You got this!
+    setMessage('');
+    setSpinnerOn(true)
+    try {
+      const response = await fetch(`${articlesUrl}/${article_id}`, {
+        method: 'PUT',
+        headers: {'Content-Type': 'aplication/json', Authorization: localStorage.getItem('token')},
+        body: JSON.stringify(article)
+      })
+      const data = await response.json()
+
+      if (response.ok) {
+        setArticles(articles.map((art) => (art.article_id === article_id ? data.article : art)))
+        setMessage(data.message)
+      } else {
+        setMessage(data.message)
+      }
+    } catch (error) {
+      setMessage('An error occured updating') // Need to check what error messages show under, error.message or data.error
+    } finally {
+      setSpinnerOn(false)
+    }
   }
 
-  const deleteArticle = article_id => {
+  const deleteArticle = async (article_id) => {
     // ✨ implement
+    setMessage('');
+    setSpinnerOn(true)
+    try {
+      const response = await fetch(`${articlesUrl}/${article_id}`, {
+        method: 'DELETE',
+        headers: {
+          Authorization: localStorage.getItem('token')
+        }
+      })
+      const data = await response.json()
+      if (response.ok){
+        setArticles(articles.filter((art) => art.article_id !== article_id))
+        setMessage(data.message)
+      } else {
+        setMessage(data.message)
+      }
+    } catch (error) {
+      setMessage('An error deleting occured')
+    } finally {
+      setSpinnerOn(false)
+    }
   }
 
   return (
     // ✨ fix the JSX: `Spinner`, `Message`, `LoginForm`, `ArticleForm` and `Articles` expect props ❗
     <>
-      <Spinner />
-      <Message />
+      <Spinner spinnerOn={spinnerOn} />
+      <Message message={message}/>
       <button id="logout" onClick={logout}>Logout from app</button>
       <div id="wrapper" style={{ opacity: spinnerOn ? "0.25" : "1" }}> {/* <-- do not change this line */}
         <h1>Advanced Web Applications</h1>
@@ -78,11 +187,21 @@ export default function App() {
           <NavLink id="articlesScreen" to="/articles">Articles</NavLink>
         </nav>
         <Routes>
-          <Route path="/" element={<LoginForm />} />
+          <Route path="/" element={<LoginForm login={login}/>} />
           <Route path="articles" element={
             <>
-              <ArticleForm />
-              <Articles />
+              <ArticleForm 
+                postArticle={postArticle}
+                updateArticle={updateArticle}
+                setCurrentArticleId={setCurrentArticleId}
+              />
+              <Articles 
+                articles={articles}
+                getArticles={getArticles}
+                deleteArticle={deleteArticle}
+                setCurrentArticleId={setCurrentArticleId}
+                currentArticleId={currentArticleId}
+              />
             </>
           } />
         </Routes>
