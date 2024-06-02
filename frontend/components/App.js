@@ -5,9 +5,10 @@ import LoginForm from './LoginForm'
 import Message from './Message'
 import ArticleForm from './ArticleForm'
 import Spinner from './Spinner'
+import axios from 'axios'
 
 const articlesUrl = 'http://localhost:9000/api/articles'
-const loginUrl = 'http://localhost:9000/api/login'
+const loginUrl = 'http://localhost:9000/api/login' 
 
 export default function App() {
   // ✨ MVP can be achieved with these states
@@ -15,16 +16,23 @@ export default function App() {
   const [articles, setArticles] = useState([])
   const [currentArticleId, setCurrentArticleId] = useState()
   const [spinnerOn, setSpinnerOn] = useState(false)
+  const currentArticle = articles.find(article => article.article_id === currentArticleId)
 
   // ✨ Research `useNavigate` in React Router v.6
-  const navigate = useNavigate()
-  const redirectToLogin = () => {  navigate('/login')}
+  const navigate = useNavigate() 
+  const redirectToLogin = () => {  navigate('/')} // took login out
   const redirectToArticles = () => { navigate('/articles')}
 
   const logout = () => {
-    localStorage.removeItem('token')
-    setMessage('Goodbye!')
-    redirectToLogin()
+    const token = localStorage.getItem('token') 
+    
+    if (token) {
+      localStorage.removeItem('token')
+      setMessage('Goodbye!')
+      redirectToLogin()
+      console.log('logout successful')
+      
+    } 
     // ✨ implement
     // If a token is in local storage it should be removed,
     // and a message saying "Goodbye!" should be set in its proper state.
@@ -35,11 +43,11 @@ export default function App() {
   const login = async ({ username, password }) => {
     setMessage('')
     setSpinnerOn(true)
-    redirectToArticles()
+    
     try {
       const response = await fetch(loginUrl, {
         method: 'POST',
-        headers: {'Content-Type': 'application/json', Authorization: localStorage.getItem('token')},
+        headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({username, password})
       })
       const data = await response.json()
@@ -47,16 +55,12 @@ export default function App() {
       if(response.ok){
         localStorage.setItem('token', data.token)
         setMessage(data.message)
-      } else if 
-        (response.status === 401){
-          logout()
-      }
-      else {
-        setMessage(data.message)
-      }
+        redirectToArticles() 
+        setSpinnerOn(false)
+      } 
     } catch (error) {
-      setMessage('Login Failed')
-    } finally {setSpinnerOn(false)}
+      setMessage(error.message || 'Login Failed')
+    } 
     // ✨ implement
     // We should flush the message state, turn on the spinner
     // and launch a request to the proper endpoint.
@@ -65,26 +69,31 @@ export default function App() {
     // to the Articles screen. Don't forget to turn off the spinner!
   }
 
+  const updateCurrentArticleId = (id) => {
+    setCurrentArticleId(id)
+    
+  }
+
   const getArticles = async () => {
     setMessage('');
-    setSpinnerOn(true)
-    try {
-      const response = await fetch(articlesURL, {
+    setSpinnerOn(true) 
+     try {
+      const response = await axios.get(articlesUrl, {
         headers: {Authorization: localStorage.getItem('token')}
       })
-      const data = await response.json()
-
-      if (response.ok) {
-        setArticles(data)
-        setMessage(data.message)
-      } else {
-        setMessage('Failed to retrieve articles')
-      }
-    } catch (error) {
-      setMessage('Failed to retrieve articles')
+      if (response.status === 200){
+        setArticles(response.data.articles || [])
+        setMessage(response.data.message)}
+        else {setMessage('Failed to retrieve articles')}
+    } catch (error) { 
+      if (error.response.status === 401){
+        redirectToLogin()
+      } else {console.log('Failed to retrieve articles')}
     } finally {
       setSpinnerOn(false)
-    }
+      console.log('Spinner off')
+      
+    } 
     // ✨ implement
     // We should flush the message state, turn on the spinner
     // and launch an authenticated request to the proper endpoint.
@@ -93,20 +102,34 @@ export default function App() {
     // If something goes wrong, check the status of the response:
     // if it's a 401 the token might have gone bad, and we should redirect to login.
     // Don't forget to turn off the spinner!
+   /* axios
+      .get(articlesUrl)
+      .then(res => {
+        setArticles(res.data.articles)
+        setMessage(res.data.message)
+      })
+      .catch(error => {
+        setMessage('Failed to fetch articles')
+        if (error.status === 401){
+          redirectToLogin()
+        }
+      })
+      .finally(() => setSpinnerOn(false))
+ */
   }
 
   const postArticle = async (article) => {
     setMessage('');
     setSpinnerOn(true)
     try {
-      const response = await fetch(articlesURL, {
+      const response = await fetch(articlesUrl, {
         method: 'POST',
-        headers: {'Content-Type': 'aplication/json', Authorization: localStorage.getItem('token')},
+        headers: {'Content-Type': 'application/json', Authorization: localStorage.getItem('token')},
         body: JSON.stringify(article)
       })
       const data = await response.json()
       if (response.ok) {
-        setArticles([...articles, data])
+        setArticles([...articles, data.article]) //added .article
         setMessage(data.message)
       } else {
         setMessage('Failed to retrieve articles')
@@ -128,10 +151,11 @@ export default function App() {
     // You got this!
     setMessage('');
     setSpinnerOn(true)
+    
     try {
       const response = await fetch(`${articlesUrl}/${article_id}`, {
         method: 'PUT',
-        headers: {'Content-Type': 'aplication/json', Authorization: localStorage.getItem('token')},
+        headers: {'Content-Type': 'application/json', Authorization: localStorage.getItem('token')},
         body: JSON.stringify(article)
       })
       const data = await response.json()
@@ -139,6 +163,7 @@ export default function App() {
       if (response.ok) {
         setArticles(articles.map((art) => (art.article_id === article_id ? data.article : art)))
         setMessage(data.message)
+        setCurrentArticleId(null)
       } else {
         setMessage(data.message)
       }
@@ -146,6 +171,7 @@ export default function App() {
       setMessage('An error occured updating') // Need to check what error messages show under, error.message or data.error
     } finally {
       setSpinnerOn(false)
+      console.log('edit button hit')
     }
   }
 
@@ -194,6 +220,8 @@ export default function App() {
                 postArticle={postArticle}
                 updateArticle={updateArticle}
                 setCurrentArticleId={setCurrentArticleId}
+                currentArticleId={currentArticleId}
+                currentArticle={currentArticle}
               />
               <Articles 
                 articles={articles}
@@ -201,6 +229,8 @@ export default function App() {
                 deleteArticle={deleteArticle}
                 setCurrentArticleId={setCurrentArticleId}
                 currentArticleId={currentArticleId}
+                updateCurrentArticleId={updateCurrentArticleId}
+
               />
             </>
           } />
