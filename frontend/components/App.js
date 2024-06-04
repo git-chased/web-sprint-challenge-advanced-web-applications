@@ -45,21 +45,21 @@ export default function App() {
     setSpinnerOn(true)
     
     try {
-      const response = await fetch(loginUrl, {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({username, password})
+      const response = await axios.post(loginUrl, {
+        username,
+        password
+        }, {headers: {'Content-Type': 'application/json'}
       })
-      const data = await response.json()
-
-      if(response.ok){
+      const data = response.data
+      if(response.status === 200){
         localStorage.setItem('token', data.token)
         setMessage(data.message)
         redirectToArticles() 
         setSpinnerOn(false)
       } 
     } catch (error) {
-      setMessage(error.message || 'Login Failed')
+      setMessage(error.response?.data?.message || 'Login Failed')
+      setSpinnerOn(false)
     } 
     // ✨ implement
     // We should flush the message state, turn on the spinner
@@ -88,6 +88,7 @@ export default function App() {
     } catch (error) { 
       if (error.response.status === 401){
         redirectToLogin()
+        setSpinnerOn(false)
       } else {console.log('Failed to retrieve articles')}
     } finally {
       setSpinnerOn(false)
@@ -122,20 +123,15 @@ export default function App() {
     setMessage('');
     setSpinnerOn(true)
     try {
-      const response = await fetch(articlesUrl, {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json', Authorization: localStorage.getItem('token')},
-        body: JSON.stringify(article)
+      const response = await axios.post(articlesUrl, article, {
+        headers: {'Content-Type': 'application/json', Authorization: localStorage.getItem('token')}
+        
       })
-      const data = await response.json()
-      if (response.ok) {
-        setArticles([...articles, data.article]) //added .article
-        setMessage(data.message)
-      } else {
-        setMessage('Failed to retrieve articles')
-      }
+      const data = response.data 
+      setArticles([...articles, data.article]) //added .article
+      setMessage(data.message)
     } catch (error) {
-      setMessage('Failed to post article')
+      setMessage(error.response?.data?.message || 'Failed to post article')
     } finally {
       setSpinnerOn(false)
     }
@@ -153,22 +149,17 @@ export default function App() {
     setSpinnerOn(true)
     
     try {
-      const response = await fetch(`${articlesUrl}/${article_id}`, {
-        method: 'PUT',
-        headers: {'Content-Type': 'application/json', Authorization: localStorage.getItem('token')},
-        body: JSON.stringify(article)
+      const response = await axios.put(`${articlesUrl}/${article_id}`, article, {
+       
+        headers: {'Content-Type': 'application/json', Authorization: localStorage.getItem('token')}
+        
       })
-      const data = await response.json()
-
-      if (response.ok) {
-        setArticles(articles.map((art) => (art.article_id === article_id ? data.article : art)))
-        setMessage(data.message)
-        setCurrentArticleId(null)
-      } else {
-        setMessage(data.message)
-      }
+      const data = response.data
+      setArticles(articles.map((art) => (art.article_id === article_id ? data.article : art)))
+      setMessage(data.message)
+      setCurrentArticleId(null)
     } catch (error) {
-      setMessage('An error occured updating') // Need to check what error messages show under, error.message or data.error
+      setMessage(error.response?.data?.message ||'An error occured updating') // Need to check what error messages show under, error.message or data.error
     } finally {
       setSpinnerOn(false)
       console.log('edit button hit')
@@ -180,19 +171,14 @@ export default function App() {
     setMessage('');
     setSpinnerOn(true)
     try {
-      const response = await fetch(`${articlesUrl}/${article_id}`, {
-        method: 'DELETE',
+      const response = await axios.delete(`${articlesUrl}/${article_id}`, {
         headers: {
           Authorization: localStorage.getItem('token')
         }
       })
-      const data = await response.json()
-      if (response.ok){
-        setArticles(articles.filter((art) => art.article_id !== article_id))
-        setMessage(data.message)
-      } else {
-        setMessage(data.message)
-      }
+      const data = response.data
+      setArticles(articles.filter((art) => art.article_id !== article_id))
+      setMessage(data.message)
     } catch (error) {
       setMessage('An error deleting occured')
     } finally {
